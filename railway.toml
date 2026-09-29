@@ -1,9 +1,0 @@
-[build]
-builder = "railpack"
-buildCommand = "npm run build:api"
-
-[deploy]
-preDeployCommand = ["npm run db:deploy"]
-startCommand = "npm run start -w @epx-food/api"
-healthcheckPath = "/health"
-healthcheckTimeout = 120
