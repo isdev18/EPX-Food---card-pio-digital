@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "concurrently -n API,WEB -c yellow,cyan \"npm run dev -w @epx-food/api\" \"npm run dev -w @epx-food/web\"",
     "build": "npm run build -w @epx-food/api && npm run build -w @epx-food/web",
+    "build:api": "npm run db:generate && npm run build -w @epx-food/api",
     "test": "npm run test -w @epx-food/api && npm run test -w @epx-food/web",
     "db:generate": "prisma generate --schema apps/api/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema apps/api/prisma/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema apps/api/prisma/schema.prisma",
     "db:seed": "tsx apps/api/prisma/seed.ts",
     "whatsapp:link": "npm run whatsapp:link -w @epx-food/api"
   },
