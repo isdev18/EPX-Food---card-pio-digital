@@ -55,7 +55,7 @@ async function providerFor(restaurantId: string) {
     const created = new QrWhatsAppProvider(restaurantId, {
       authPath,
       chromePath: env.WWEBJS_CHROME_PATH || undefined,
-      disableSandbox: env.WWEBJS_DISABLE_SANDBOX,
+      disableSandbox: env.WWEBJS_DISABLE_SANDBOX || Boolean(process.env.RAILWAY_ENVIRONMENT),
       qrLifetimeMs: 60_000,
       maxReconnectAttempts: 2,
     });

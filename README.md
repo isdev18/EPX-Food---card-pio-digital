@@ -102,7 +102,7 @@ Copie `.env.example` e preencha:
 - `META_APP_SECRET`: segredo do app usado para validar `X-Hub-Signature-256`;
 - `META_REDIRECT_URI`: URI de redirecionamento OAuth cadastrada na Meta, quando exigida pela configuração;
 - `TOKEN_ENCRYPTION_SECRET`: segredo exclusivo para criptografar tokens no banco; obrigatório em produção quando a Meta estiver configurada;
-- `WWEBJS_DISABLE_SANDBOX`: mantenha `false`; habilite somente em ambiente isolado que exija execução sem sandbox;
+- `WWEBJS_DISABLE_SANDBOX`: mantenha `false` localmente; no Railway o ambiente isolado é detectado automaticamente;
 - `VITE_API_URL`: URL pública da API usada pelo painel.
 
 Nenhuma chave deve ser colocada no frontend ou versionada.
@@ -140,6 +140,9 @@ O endpoint `POST` valida `X-Hub-Signature-256` quando o segredo está configurad
 | `POST` | `/api/auth/register` | criação do primeiro restaurante e proprietário |
 | `GET` | `/api/dashboard` | indicadores do tenant |
 | `GET` | `/api/catalog` | cardápio disponível |
+| `GET/POST/PATCH/DELETE` | `/api/coupons` | administrar cupons de desconto |
+| `GET/POST/PATCH/DELETE` | `/api/promotions` | administrar promoções e produtos vinculados |
+| `GET/PATCH` | `/api/settings` | consultar e editar configurações da loja |
 | `GET` | `/api/customers` | clientes da pizzaria |
 | `GET/POST` | `/api/orders` | listar e criar pedidos |
 | `PATCH` | `/api/orders/:id/status` | avançar status validado |

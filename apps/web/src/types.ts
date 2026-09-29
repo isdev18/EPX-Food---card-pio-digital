@@ -7,4 +7,22 @@ export type Order = {
 };
 export type Product = { id: string; name: string; description?: string | null; imageUrl?: string | null; basePrice: number; active: boolean; isPizza: boolean };
 export type Category = { id: string; name: string; icon?: string | null; products: Product[] };
+
+export type Coupon = {
+  id: string; code: string; type: 'FIXED' | 'PERCENTAGE'; value: number; minimumOrder: number;
+  expiresAt: string | null; maxUses: number | null; uses: number; active: boolean;
+};
+
+export type Promotion = {
+  id: string; name: string; description: string | null; promotionalPrice: number | null;
+  startsAt: string; endsAt: string | null; active: boolean;
+  items: { id: string; productId: string; product: { id: string; name: string; imageUrl?: string | null } }[];
+};
+
+export type RestaurantSettings = {
+  id: string; name: string; slug: string; phone: string | null; logoUrl: string | null; bannerUrl: string | null;
+  primaryColor: string; secondaryColor: string; addressText: string; openingHoursText: string;
+  deliveryEstimateMin: number; deliveryEstimateMax: number; minimumOrder: number;
+  acceptScheduledOrders: boolean; halfPizzaPricing: 'HIGHEST' | 'AVERAGE';
+};
 export type DeliveryZone = { id: string; neighborhood: string; fee: number; estimatedMinutes: number; active: boolean };

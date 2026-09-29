@@ -3,6 +3,12 @@ import { z } from 'zod';
 import type { AuthRequest } from '../middlewares/auth.js';
 import { archiveCatalogProduct, createCatalogProduct, listCatalog, updateCatalogProduct } from '../services/catalog.service.js';
 
+const imageSchema = z.union([
+  z.string().url().max(2_000).refine((value) => value.startsWith('https://'), 'Use uma URL HTTPS.'),
+  z.string().max(950_000).regex(/^data:image\/(?:jpeg|png|webp);base64,/, 'Formato de imagem inválido.'),
+  z.null(),
+]);
+
 export async function index(req: AuthRequest, res: Response) {
   return res.json(await listCatalog(req.auth!.restaurantId));
 }
@@ -12,6 +18,7 @@ export async function create(req: AuthRequest, res: Response) {
     categoryId: z.string().min(1),
     name: z.string().trim().min(2).max(120),
     description: z.string().trim().max(500).optional(),
+    imageUrl: imageSchema.optional(),
     basePrice: z.number().positive().max(100_000),
     isPizza: z.boolean().default(false),
   }).parse(req.body);
@@ -22,6 +29,7 @@ export async function update(req: AuthRequest, res: Response) {
   const input = z.object({
     name: z.string().trim().min(2).max(120).optional(),
     description: z.string().trim().max(500).optional(),
+    imageUrl: imageSchema.optional(),
     basePrice: z.number().positive().max(100_000).optional(),
     active: z.boolean().optional(),
   }).refine((value) => Object.keys(value).length > 0, 'Informe ao menos uma alteração.').parse(req.body);

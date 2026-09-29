@@ -11,14 +11,14 @@ export async function listCatalog(restaurantId: string) {
   return categories.map((category) => ({ ...category, products: category.products.map(productPayload) }));
 }
 
-export async function createCatalogProduct(restaurantId: string, input: { categoryId: string; name: string; description?: string; basePrice: number; isPizza: boolean }) {
+export async function createCatalogProduct(restaurantId: string, input: { categoryId: string; name: string; description?: string; imageUrl?: string | null; basePrice: number; isPizza: boolean }) {
   const category = await prisma.category.findFirst({ where: { id: input.categoryId, restaurantId, active: true } });
   if (!category) throw new HttpError(404, 'Categoria não encontrada.');
   const duplicate = await prisma.product.findFirst({ where: { restaurantId, name: { equals: input.name, mode: 'insensitive' } } });
   if (duplicate && !duplicate.archivedAt) throw new HttpError(409, 'Já existe um produto com este nome.');
   if (duplicate?.archivedAt) {
     const restored = await prisma.$transaction(async (tx) => {
-      const product = await tx.product.update({ where: { id: duplicate.id }, data: { categoryId: category.id, name: input.name, description: input.description, basePrice: input.basePrice, active: true, archivedAt: null, isPizza: input.isPizza } });
+      const product = await tx.product.update({ where: { id: duplicate.id }, data: { categoryId: category.id, name: input.name, description: input.description, imageUrl: input.imageUrl, basePrice: input.basePrice, active: true, archivedAt: null, isPizza: input.isPizza } });
       if (input.isPizza) {
         await tx.flavor.upsert({ where: { restaurantId_name: { restaurantId, name: input.name } }, update: { description: input.description, active: true }, create: { restaurantId, name: input.name, description: input.description, active: true } });
       }
@@ -32,6 +32,7 @@ export async function createCatalogProduct(restaurantId: string, input: { catego
       categoryId: category.id,
       name: input.name,
       description: input.description,
+      imageUrl: input.imageUrl,
       basePrice: input.basePrice,
       ingredients: [],
       active: true,
@@ -43,7 +44,7 @@ export async function createCatalogProduct(restaurantId: string, input: { catego
   return productPayload(product);
 }
 
-export async function updateCatalogProduct(restaurantId: string, productId: string, input: { name?: string; description?: string; basePrice?: number; active?: boolean }) {
+export async function updateCatalogProduct(restaurantId: string, productId: string, input: { name?: string; description?: string; imageUrl?: string | null; basePrice?: number; active?: boolean }) {
   const product = await prisma.product.findFirst({ where: { id: productId, restaurantId, archivedAt: null } });
   if (!product) throw new HttpError(404, 'Produto não encontrado.');
   if (input.name && input.name.toLocaleLowerCase('pt-BR') !== product.name.toLocaleLowerCase('pt-BR')) {

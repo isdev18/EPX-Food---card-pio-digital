@@ -11,6 +11,9 @@ const Customers = lazy(() => import('./pages/Customers').then((module) => ({ def
 const Deliveries = lazy(() => import('./pages/Deliveries').then((module) => ({ default: module.Deliveries })));
 const ModulePage = lazy(() => import('./pages/Modules').then((module) => ({ default: module.ModulePage })));
 const WhatsApp = lazy(() => import('./pages/WhatsApp').then((module) => ({ default: module.WhatsApp })));
+const Coupons = lazy(() => import('./pages/Coupons').then((module) => ({ default: module.Coupons })));
+const Promotions = lazy(() => import('./pages/Promotions').then((module) => ({ default: module.Promotions })));
+const Settings = lazy(() => import('./pages/Settings').then((module) => ({ default: module.Settings })));
 const PublicMenu = lazy(() => import('./pages/PublicMenu').then((module) => ({ default: module.PublicMenu })));
 const OrderTracking = lazy(() => import('./pages/PublicMenu').then((module) => ({ default: module.OrderTracking })));
 
@@ -32,11 +35,11 @@ export function App() {
         <Route path="cardapio" element={<Catalog />} />
         <Route path="clientes" element={<Customers />} />
         <Route path="entregas" element={<Deliveries />} />
-        <Route path="cupons" element={<ModulePage type="cupons" />} />
-        <Route path="promocoes" element={<ModulePage type="promocoes" />} />
+        <Route path="cupons" element={<Coupons />} />
+        <Route path="promocoes" element={<Promotions />} />
         <Route path="relatorios" element={<ModulePage type="relatorios" />} />
         <Route path="whatsapp" element={<WhatsApp />} />
-        <Route path="configuracoes" element={<ModulePage type="configuracoes" />} />
+        <Route path="configuracoes" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

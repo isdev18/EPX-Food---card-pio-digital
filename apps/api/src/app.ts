@@ -25,7 +25,7 @@ app.use(cors({
   },
 }));
 app.use(express.json({
-  limit: '1mb',
+  limit: '2mb',
   verify: (req, _res, buffer) => { (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer); },
 }));
 app.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-7' }));
