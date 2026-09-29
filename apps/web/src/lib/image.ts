@@ -1,13 +1,26 @@
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 const MAX_DATA_URL_LENGTH = 900_000;
 
-function loadImage(file: File) {
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') return resolve(reader.result);
+      return reject(new Error('Não foi possível ler o arquivo da imagem.'));
+    };
+    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo da imagem.'));
+    reader.onabort = () => reject(new Error('A leitura da imagem foi cancelada.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadImage(file: File) {
+  const source = await readFileAsDataUrl(file);
   return new Promise<HTMLImageElement>((resolve, reject) => {
-    const url = URL.createObjectURL(file);
     const image = new Image();
-    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
-    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Não foi possível ler a imagem.')); };
-    image.src = url;
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Formato de imagem inválido ou não compatível. Use PNG, JPG ou WebP.'));
+    image.src = source;
   });
 }
 
