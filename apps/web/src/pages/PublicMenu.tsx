@@ -6,7 +6,8 @@ import './PublicMenu.css';
 
 const crypto = { randomUUID: createId };
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL
+  ?? (import.meta.env.PROD ? '/api' : 'http://localhost:3000/api');
 const brl = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 const pizzaDayPromotion = () => `${['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][new Date().getDay()]} da Pizza`;
 type Product = { id: string; name: string; description?: string; imageUrl?: string | null; basePrice: number; promotionalPrice?: number | null; active: boolean; isPizza: boolean };

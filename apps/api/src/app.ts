@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { env } from './config/env.js';
 import { authRouter } from './routes/auth.routes.js';
 import { apiRouter } from './routes/api.routes.js';
@@ -32,5 +34,15 @@ app.use('/api/auth', authRouter);
 app.use('/api/public', publicRouter);
 app.use('/api', apiRouter);
 app.use('/webhooks', webhookRouter);
+
+const webDistPath = fileURLToPath(new URL('../../web/dist', import.meta.url));
+if (existsSync(webDistPath)) {
+  app.use(express.static(webDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/webhooks/')) return next();
+    return res.sendFile('index.html', { root: webDistPath });
+  });
+}
+
 app.use((_req, res) => res.status(404).json({ message: 'Rota não encontrada.' }));
 app.use(errorHandler);
