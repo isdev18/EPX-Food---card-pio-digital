@@ -1,0 +1,33 @@
+import type { Response } from 'express';
+import { z } from 'zod';
+import type { AuthRequest } from '../middlewares/auth.js';
+import { archiveCatalogProduct, createCatalogProduct, listCatalog, updateCatalogProduct } from '../services/catalog.service.js';
+
+export async function index(req: AuthRequest, res: Response) {
+  return res.json(await listCatalog(req.auth!.restaurantId));
+}
+
+export async function create(req: AuthRequest, res: Response) {
+  const input = z.object({
+    categoryId: z.string().min(1),
+    name: z.string().trim().min(2).max(120),
+    description: z.string().trim().max(500).optional(),
+    basePrice: z.number().positive().max(100_000),
+    isPizza: z.boolean().default(false),
+  }).parse(req.body);
+  return res.status(201).json(await createCatalogProduct(req.auth!.restaurantId, input));
+}
+
+export async function update(req: AuthRequest, res: Response) {
+  const input = z.object({
+    name: z.string().trim().min(2).max(120).optional(),
+    description: z.string().trim().max(500).optional(),
+    basePrice: z.number().positive().max(100_000).optional(),
+    active: z.boolean().optional(),
+  }).refine((value) => Object.keys(value).length > 0, 'Informe ao menos uma alteração.').parse(req.body);
+  return res.json(await updateCatalogProduct(req.auth!.restaurantId, String(req.params.id), input));
+}
+
+export async function destroy(req: AuthRequest, res: Response) {
+  return res.json(await archiveCatalogProduct(req.auth!.restaurantId, String(req.params.id)));
+}

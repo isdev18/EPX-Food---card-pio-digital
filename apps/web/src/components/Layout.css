@@ -1,0 +1,19 @@
+.sidebar-head {
+  padding: 0 8px 0 !important;
+  min-height: 42px;
+  align-items: center;
+}
+
+.sidebar {
+  padding: 0 14px 12px !important;
+}
+
+.main-nav {
+  gap: 0 !important;
+  margin-top: 0;
+}
+
+.main-nav a {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}

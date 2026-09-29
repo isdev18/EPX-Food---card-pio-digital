@@ -1,0 +1,33 @@
+node_modules/
+dist/
+coverage/
+
+# Segredos e configurações locais
+.env*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Bancos, dumps e dados de execução
+apps/api/prisma/dev.db*
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.log
+
+# Sessões locais do WhatsApp/Chromium (podem autenticar uma conta real)
+**/.wwebjs_auth/
+**/.wwebjs_auth_backup/
+**/.wwebjs_cache/
+
+# Artefatos locais e gerados
+.tools/
+.tmp-*
+*-check.png
+*.tsbuildinfo
+apps/web/vite.config.js
+apps/web/vite.config.d.ts
+.DS_Store
