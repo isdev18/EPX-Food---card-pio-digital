@@ -1,4 +1,4 @@
-# EPX-Food---card-pio-digital
+# EPX Menu — cardápio digital
 
 MVP full stack para receber pedidos via WhatsApp Cloud API, aplicar regras comerciais no backend e acompanhar a operação em um painel responsivo. A base já nasce multiempresa: as consultas de domínio recebem `restaurantId` do token autenticado, nunca do corpo enviado pelo cliente.
 
@@ -103,9 +103,14 @@ Copie `.env.example` e preencha:
 - `META_REDIRECT_URI`: URI de redirecionamento OAuth cadastrada na Meta, quando exigida pela configuração;
 - `TOKEN_ENCRYPTION_SECRET`: segredo exclusivo para criptografar tokens no banco; obrigatório em produção quando a Meta estiver configurada;
 - `WWEBJS_DISABLE_SANDBOX`: mantenha `false` localmente; no Railway o ambiente isolado é detectado automaticamente;
+- `ASAAS_BASE_URL`: URL da API de Sandbox ou produção do Asaas;
+- `ASAAS_API_KEY`: chave privada da API Asaas, usada somente pelo backend;
+- `ASAAS_WEBHOOK_TOKEN`: segredo próprio de 32+ caracteres para validar notificações do Asaas;
 - `VITE_API_URL`: URL pública da API usada pelo painel.
 
 Nenhuma chave deve ser colocada no frontend ou versionada.
+
+As credenciais `ASAAS_*` ficam reservadas para uma possível integração futura. O checkout atual não chama a API do Asaas nem gera cobranças: o cliente apenas informa se pagará com PIX, cartão ou dinheiro na entrega/retirada.
 
 ## Configuração do WhatsApp
 
@@ -154,7 +159,7 @@ O endpoint `POST` valida `X-Hub-Signature-256` quando o segredo está configurad
 | `GET/POST` | `/webhooks/whatsapp` | integração oficial Meta |
 | `DELETE` | `/api/integrations/whatsapp-web/session` | encerra a sessão experimental para gerar um novo QR |
 
-### Cardápio público EPX Food
+### Cardápio público EPX Menu
 
 - Abra `http://localhost:5173/r/{slug-do-restaurante}` para criar uma sessão segura e entrar no cardápio.
 - A sessão é redirecionada para `/menu/s/{token}`; somente o hash do token é persistido.

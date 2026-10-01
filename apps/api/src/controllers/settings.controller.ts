@@ -14,6 +14,8 @@ const settingsSchema = z.object({
   phone: z.string().trim().max(30).nullable().optional(),
   logoUrl: imageSchema.optional(),
   bannerUrl: imageSchema.optional(),
+  pixKey: z.string().trim().max(180).nullable().optional(),
+  pixQrCodeUrl: imageSchema.optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   addressText: z.string().trim().max(300).nullable().optional(),

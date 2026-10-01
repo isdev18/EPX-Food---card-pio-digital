@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 
 export type PizzaSelection = {
+  productId?: string;
   sizeId: string;
   flavorIds: string[];
   crustId: string;
@@ -44,13 +45,19 @@ export async function pricePizza(restaurantId: string, selection: PizzaSelection
   const products = await prisma.product.findMany({
     where: { restaurantId, active: true, archivedAt: null, isPizza: true, name: { in: flavorNames } },
   });
-  if (products.length !== new Set(flavorNames).size) throw new Error('Um sabor não possui produto disponível no cardápio.');
+  const selectedProduct = selection.productId
+    ? await prisma.product.findFirst({ where: { id: selection.productId, restaurantId, active: true, archivedAt: null, isPizza: true } })
+    : null;
+  const fallbackProduct = selectedProduct ?? products[0] ?? await prisma.product.findFirst({
+    where: { restaurantId, active: true, archivedAt: null, isPizza: true }, orderBy: { name: 'asc' },
+  });
+  if (!fallbackProduct) throw new Error('Cadastre ao menos uma pizza ativa para vender estes sabores.');
   const productMap = new Map(products.map((product) => [product.name, product]));
-  const basePrice = Math.max(...flavorNames.map((name) => Number(productMap.get(name)!.basePrice)));
+  const basePrice = Math.max(...flavorNames.map((name) => Number(productMap.get(name)?.basePrice ?? fallbackProduct.basePrice)));
   const surcharge = Math.max(...orderedFlavors.map((flavor) => Number(flavor.surcharge)), 0);
   const extrasPrice = extras.reduce((sum, extra) => sum + Number(extra.price), 0);
   const unitPrice = basePrice * Number(size.priceMultiplier) + surcharge + Number(crust.price) + extrasPrice;
-  const product = productMap.get(flavorNames[0])!;
+  const product = selectedProduct ?? productMap.get(flavorNames[0]) ?? fallbackProduct;
 
   return {
     productId: product.id,

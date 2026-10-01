@@ -36,6 +36,7 @@ export function Layout() {
     <main className="main-area">
       <header className="topbar"><div className="topbar-title"><button className="menu-button" onClick={() => setOpen(true)}><Menu /></button><div><h1>{title}</h1><p>{subtitle}</p></div></div><div className="top-actions"><label className="global-search"><Search size={17} /><input placeholder="Buscar pedido ou cliente..." onKeyDown={(event) => { if (event.key === 'Enter') navigate(`/pedidos?q=${encodeURIComponent(event.currentTarget.value)}`); }} /></label><button className="icon-button notification" onClick={() => alert('Você não tem novas notificações.')} aria-label="Notificações"><Bell size={19} /></button><button className="profile" onClick={() => navigate('/configuracoes')}><span>{initials}</span><div><b>{userName}</b><small>{role}</small></div><ChevronDown size={15} /></button></div></header>
       <section className="content"><Outlet /></section>
+      <footer className="app-footer">Desenvolvido pela <strong>EPX Group Tech</strong></footer>
     </main>
   </div>;
 }

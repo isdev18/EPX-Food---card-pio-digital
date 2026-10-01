@@ -9,7 +9,7 @@ export async function getDashboard(restaurantId: string) {
   const products = new Map<string, number>();
   orders.flatMap((order) => order.items).forEach((item) => products.set(item.name, (products.get(item.name) ?? 0) + item.quantity));
   return {
-    metrics: { orders: orders.length, revenue, averageTicket: orders.length ? revenue / orders.length : 0, preparing: count(OrderStatus.PREPARING), delivering: count(OrderStatus.OUT_FOR_DELIVERY), completed: count(OrderStatus.DELIVERED) },
+    metrics: { orders: orders.length, revenue, averageTicket: orders.length ? revenue / orders.length : 0, preparing: count(OrderStatus.PREPARING), delivering: count(OrderStatus.OUT_FOR_DELIVERY), completed: orders.filter((order) => !order.address && (order.status === OrderStatus.READY || order.status === OrderStatus.DELIVERED)).length },
     topProducts: [...products.entries()].map(([name, quantity]) => ({ name, quantity })).sort((a, b) => b.quantity - a.quantity).slice(0, 5),
   };
 }

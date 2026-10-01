@@ -74,7 +74,7 @@ export async function prepareCartForOrder(restaurantId: string, customerId: stri
       const extraIds = Array.isArray(extras.ids) ? extras.ids.filter((id): id is string => typeof id === 'string') : [];
       const size = await prisma.pizzaSize.findFirst({ where: { restaurantId, name: item.sizeName, active: true } });
       if (!size || typeof crust.id !== 'string') throw new Error('A configuração de uma pizza não está mais disponível.');
-      priced = await pricePizza(restaurantId, { sizeId: size.id, flavorIds, crustId: crust.id, extraIds });
+      priced = await pricePizza(restaurantId, { productId: item.productId, sizeId: size.id, flavorIds, crustId: crust.id, extraIds });
     } else {
       priced = await priceProduct(restaurantId, item.productId);
     }

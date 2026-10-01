@@ -89,6 +89,8 @@ model Restaurant {
   phone String?
   logoUrl String?
   bannerUrl String?
+  pixKey String?
+  pixQrCodeUrl String?
   primaryColor String @default("#E94F37")
   secondaryColor String @default("#17352D")
   address Json?
@@ -141,6 +143,7 @@ model Customer {
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   name String?
   phone String
+  asaasCustomerId String? @unique
   lastOrderAt DateTime?
   orderCount Int @default(0)
   totalSpent Decimal @default(0) @db.Decimal(12, 2)
@@ -402,6 +405,17 @@ model Payment {
   metadata Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@unique([provider, providerId])
+}
+
+model AsaasWebhookEvent {
+  id String @id
+  type String
+  paymentId String?
+  payload Json
+  processedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([paymentId, processedAt])
 }
 
 model Conversation {

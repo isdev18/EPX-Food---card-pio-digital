@@ -62,6 +62,7 @@ export async function registerOwner(input: { ownerName: string; restaurantName: 
           { name: 'Pequena', slices: 4, maxFlavors: 1, priceMultiplier: 0.8 },
           { name: 'Média', slices: 6, maxFlavors: 2, priceMultiplier: 1 },
           { name: 'Grande', slices: 8, maxFlavors: 2, priceMultiplier: 1.2 },
+          { name: 'Família', slices: 12, maxFlavors: 3, priceMultiplier: 1.5 },
         ],
       },
       crusts: { create: { name: 'Sem borda', price: 0 } },

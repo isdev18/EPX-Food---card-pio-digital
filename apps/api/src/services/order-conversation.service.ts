@@ -235,7 +235,7 @@ const handlers: Partial<Record<ConversationState, StateHandler>> = {
     }
     if (choice === 2) {
       const order = await prisma.order.findFirst({ where: { restaurantId, customerId: conversation.customerId, status: { notIn: ['DELIVERED', 'CANCELLED'] } }, orderBy: { createdAt: 'desc' } });
-      const labels: Record<string, string> = { NEW: 'Aguardando confirmação', CONFIRMED: 'Confirmado', PREPARING: 'Em preparação', READY: order?.address ? 'Pronto' : 'Pronto para retirada', OUT_FOR_DELIVERY: 'Saiu para entrega' };
+      const labels: Record<string, string> = { NEW: 'Pedido recebido, aguardando o preparo', CONFIRMED: 'Pedido recebido, aguardando o preparo', PREPARING: 'Está sendo preparado', READY: order?.address ? 'Está sendo preparado' : 'Já está pronto, pode ir retirar', OUT_FOR_DELIVERY: 'O motoboy saiu para entrega' };
       const trackingToken = order ? await issueOrderTrackingToken(restaurantId, order.id) : null;
       const webUrl = env.WEB_URL.split(',')[0].replace(/\/$/, '');
       return { next: 'IDLE', context: { menuShown: true }, text: order ? `🛵 *Pedido #${order.number}*\n\nStatus: ${labels[order.status] ?? order.status}\nTotal: ${money(Number(order.total))}${order.estimatedAt ? `\nPrevisão: ${order.estimatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}\n\nAcompanhe em tempo real:\n${webUrl}/pedido/${trackingToken}` : 'Não encontrei pedido ativo para este número.\n\n*0* - ↩️ Voltar' };
@@ -461,7 +461,7 @@ const handlers: Partial<Record<ConversationState, StateHandler>> = {
     return {
       next: 'ORDER_CONFIRMED',
       context: { ...context, createdOrderId: order.id, createdOrderNumber: order.number },
-      text: `✅ *PEDIDO RECEBIDO!*\n\nPedido: *#${order.number}*\nTotal: *${money(Number(order.total))}*\nPagamento: ${context.paymentMethod}\nStatus: 🕐 Aguardando confirmação\n\nVocê receberá as atualizações por aqui. 😉`,
+      text: `✅ *PEDIDO RECEBIDO!*\n\nPedido: *#${order.number}*\nTotal: *${money(Number(order.total))}*\nPagamento: ${context.paymentMethod}\nStatus: 📋 Aguardando o início do preparo\n\nVocê receberá as atualizações por aqui. 😉`,
     };
   },
 

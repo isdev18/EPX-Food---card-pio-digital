@@ -2,6 +2,8 @@ import { prisma } from '../lib/prisma.js';
 import { HttpError } from '../lib/http-error.js';
 
 const productPayload = <T extends { basePrice: unknown }>(product: T) => ({ ...product, basePrice: Number(product.basePrice) });
+const sizePayload = <T extends { priceMultiplier: unknown }>(size: T) => ({ ...size, priceMultiplier: Number(size.priceMultiplier) });
+const flavorPayload = <T extends { surcharge: unknown }>(flavor: T) => ({ ...flavor, surcharge: Number(flavor.surcharge) });
 
 export async function listCatalog(restaurantId: string) {
   const categories = await prisma.category.findMany({
@@ -38,7 +40,7 @@ export async function createCatalogProduct(restaurantId: string, input: { catego
       active: true,
       isPizza: input.isPizza,
     } });
-    if (input.isPizza) await tx.flavor.create({ data: { restaurantId, name: input.name, description: input.description, active: true } });
+    if (input.isPizza) await tx.flavor.upsert({ where: { restaurantId_name: { restaurantId, name: input.name } }, update: { description: input.description, active: true }, create: { restaurantId, name: input.name, description: input.description, active: true } });
     return created;
   });
   return productPayload(product);
@@ -77,6 +79,60 @@ export async function archiveCatalogProduct(restaurantId: string, productId: str
       await tx.flavor.updateMany({ where: { restaurantId, name: product.name }, data: { active: false } });
     }
   });
+  return { ok: true };
+}
+
+export async function listPizzaOptions(restaurantId: string) {
+  const [sizes, flavors] = await Promise.all([
+    prisma.pizzaSize.findMany({ where: { restaurantId }, orderBy: [{ active: 'desc' }, { priceMultiplier: 'asc' }] }),
+    prisma.flavor.findMany({ where: { restaurantId }, orderBy: [{ active: 'desc' }, { name: 'asc' }] }),
+  ]);
+  return { sizes: sizes.map(sizePayload), flavors: flavors.map(flavorPayload) };
+}
+
+export async function createPizzaSize(restaurantId: string, input: { name: string; slices: number; maxFlavors: number; priceMultiplier: number }) {
+  const duplicate = await prisma.pizzaSize.findFirst({ where: { restaurantId, name: { equals: input.name, mode: 'insensitive' } } });
+  if (duplicate) throw new HttpError(409, 'Já existe um tamanho com este nome.');
+  return sizePayload(await prisma.pizzaSize.create({ data: { restaurantId, ...input } }));
+}
+
+export async function updatePizzaSize(restaurantId: string, sizeId: string, input: { name?: string; slices?: number; maxFlavors?: number; priceMultiplier?: number; active?: boolean }) {
+  const size = await prisma.pizzaSize.findFirst({ where: { id: sizeId, restaurantId } });
+  if (!size) throw new HttpError(404, 'Tamanho não encontrado.');
+  if (input.name && input.name.toLocaleLowerCase('pt-BR') !== size.name.toLocaleLowerCase('pt-BR')) {
+    const duplicate = await prisma.pizzaSize.findFirst({ where: { restaurantId, name: { equals: input.name, mode: 'insensitive' }, id: { not: size.id } } });
+    if (duplicate) throw new HttpError(409, 'Já existe um tamanho com este nome.');
+  }
+  return sizePayload(await prisma.pizzaSize.update({ where: { id: size.id }, data: input }));
+}
+
+export async function deletePizzaSize(restaurantId: string, sizeId: string) {
+  const size = await prisma.pizzaSize.findFirst({ where: { id: sizeId, restaurantId } });
+  if (!size) throw new HttpError(404, 'Tamanho não encontrado.');
+  await prisma.pizzaSize.delete({ where: { id: size.id } });
+  return { ok: true };
+}
+
+export async function createFlavor(restaurantId: string, input: { name: string; description?: string; surcharge: number }) {
+  const duplicate = await prisma.flavor.findFirst({ where: { restaurantId, name: { equals: input.name, mode: 'insensitive' } } });
+  if (duplicate) throw new HttpError(409, 'Já existe um sabor com este nome.');
+  return flavorPayload(await prisma.flavor.create({ data: { restaurantId, ...input } }));
+}
+
+export async function updateFlavor(restaurantId: string, flavorId: string, input: { name?: string; description?: string; surcharge?: number; active?: boolean }) {
+  const flavor = await prisma.flavor.findFirst({ where: { id: flavorId, restaurantId } });
+  if (!flavor) throw new HttpError(404, 'Sabor não encontrado.');
+  if (input.name && input.name.toLocaleLowerCase('pt-BR') !== flavor.name.toLocaleLowerCase('pt-BR')) {
+    const duplicate = await prisma.flavor.findFirst({ where: { restaurantId, name: { equals: input.name, mode: 'insensitive' }, id: { not: flavor.id } } });
+    if (duplicate) throw new HttpError(409, 'Já existe um sabor com este nome.');
+  }
+  return flavorPayload(await prisma.flavor.update({ where: { id: flavor.id }, data: input }));
+}
+
+export async function deleteFlavor(restaurantId: string, flavorId: string) {
+  const flavor = await prisma.flavor.findFirst({ where: { id: flavorId, restaurantId } });
+  if (!flavor) throw new HttpError(404, 'Sabor não encontrado.');
+  await prisma.flavor.delete({ where: { id: flavor.id } });
   return { ok: true };
 }
 

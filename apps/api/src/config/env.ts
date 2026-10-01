@@ -25,7 +25,19 @@ const envSchema = z.object({
   META_REDIRECT_URI: z.string().default(''),
   META_APP_SECRET: z.string().default(''),
   TOKEN_ENCRYPTION_SECRET: z.string().min(32).optional(),
+  ASAAS_BASE_URL: z.string().url().default('https://api-sandbox.asaas.com/v3'),
+  ASAAS_API_KEY: z.string().default(''),
+  ASAAS_WEBHOOK_TOKEN: z.string().default(''),
 }).superRefine((value, context) => {
+  if (value.ASAAS_WEBHOOK_TOKEN && value.ASAAS_WEBHOOK_TOKEN.length < 32) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['ASAAS_WEBHOOK_TOKEN'], message: 'ASAAS_WEBHOOK_TOKEN deve ter pelo menos 32 caracteres.' });
+  }
+  if (value.ASAAS_API_KEY.startsWith('$aact_hmlg_') && !value.ASAAS_BASE_URL.includes('api-sandbox.asaas.com')) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['ASAAS_BASE_URL'], message: 'Use a URL de Sandbox com uma chave Asaas de homologacao.' });
+  }
+  if (value.ASAAS_API_KEY.startsWith('$aact_prod_') && value.ASAAS_BASE_URL.includes('api-sandbox.asaas.com')) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['ASAAS_BASE_URL'], message: 'Use a URL de producao com uma chave Asaas de producao.' });
+  }
   if (value.NODE_ENV !== 'production') return;
   if (/change-this|change-me/i.test(value.JWT_SECRET)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['JWT_SECRET'], message: 'Use um JWT_SECRET aleatório em produção.' });

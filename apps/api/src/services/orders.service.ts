@@ -47,6 +47,7 @@ export async function createOrder(restaurantId: string, input: CreateOrderInput)
     const order = await tx.order.create({ data: {
       restaurantId, customerId: customer.id, number: (last?.number ?? 1000) + 1,
       subtotal, deliveryFee, total: subtotal + deliveryFee, paymentMethod: input.paymentMethod,
+      status: OrderStatus.NEW,
       address: input.address as Prisma.InputJsonValue | undefined, notes: input.notes,
       estimatedAt: zone ? new Date(Date.now() + zone.estimatedMinutes * 60_000) : undefined,
       items: { create: items }, statusHistory: { create: { status: OrderStatus.NEW } },
@@ -73,12 +74,29 @@ export async function updateOrderStatus(restaurantId: string, orderId: string, s
   const current = await prisma.order.findFirst({ where: { id: orderId, restaurantId }, include: { customer: true, items: true } });
   if (!current) throw new HttpError(404, 'Pedido não encontrado.');
   if (current.status === status) return current;
-  if (!transitions[current.status].includes(status)) throw new HttpError(409, `Transição ${current.status} → ${status} não permitida.`);
-  const order = await prisma.order.update({ where: { id: current.id }, data: { status, statusHistory: { create: { status } } }, include: { customer: true, items: true } });
+  const simplifiedTransition = (['NEW', 'CONFIRMED'] as OrderStatus[]).includes(current.status) && status === OrderStatus.PREPARING
+    || current.status === OrderStatus.PREPARING && status === OrderStatus.OUT_FOR_DELIVERY && Boolean(current.address);
+  if (!transitions[current.status].includes(status) && !simplifiedTransition) throw new HttpError(409, `Transição ${current.status} → ${status} não permitida.`);
+  const result = await prisma.$transaction(async (tx) => {
+    const changed = await tx.order.updateMany({
+      where: { id: current.id, restaurantId, status: current.status },
+      data: { status },
+    });
+    if (!changed.count) {
+      const latest = await tx.order.findFirst({ where: { id: orderId, restaurantId }, include: { customer: true, items: true } });
+      if (!latest) throw new HttpError(404, 'Pedido não encontrado.');
+      if (latest.status === status) return { order: latest, changed: false };
+      throw new HttpError(409, 'O status deste pedido mudou. Atualize a tela e tente novamente.');
+    }
+    await tx.orderStatusHistory.create({ data: { orderId: current.id, status } });
+    const order = await tx.order.findUniqueOrThrow({ where: { id: current.id }, include: { customer: true, items: true } });
+    return { order, changed: true };
+  });
+  const { order } = result;
+  if (!result.changed) return order;
   orderEvents.emit('changed', { type: 'ORDER_UPDATED', orderId, restaurantId, status });
   const isDelivery = Boolean(order.address);
   const messages: Partial<Record<OrderStatus, string>> = {
-    CONFIRMED: `✅ Pedido #${order.number} confirmado!`,
     PREPARING: `👨‍🍳 O pedido #${order.number} está sendo preparado.`,
     READY: isDelivery ? `🍕 O pedido #${order.number} está pronto e será enviado em breve!` : `🍕 O pedido #${order.number} está pronto para retirada no balcão!`,
     OUT_FOR_DELIVERY: `🛵 O pedido #${order.number} saiu para entrega!`,

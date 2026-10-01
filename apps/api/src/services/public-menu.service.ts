@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import { PaymentMethod, Prisma } from '@prisma/client';
+import { OrderStatus, PaymentMethod, Prisma } from '@prisma/client';
 import { env } from '../config/env.js';
 import { HttpError } from '../lib/http-error.js';
 import { orderEvents } from '../lib/events.js';
@@ -61,10 +61,11 @@ export async function getPublicMenu(token: string) {
   ]);
   const promoByProduct = new Map(promotions.flatMap((promotion) => promotion.items.map((item) => [item.productId, promotion])));
   return {
-    session: { expiresAt: session.expiresAt, customerName: session.customer?.name ?? null },
+    session: { expiresAt: session.expiresAt, usedAt: session.usedAt, customerName: session.customer?.name ?? null },
     restaurant: {
       name: session.restaurant.name, slug: session.restaurant.slug, phone: session.restaurant.phone,
       logoUrl: session.restaurant.logoUrl, bannerUrl: session.restaurant.bannerUrl,
+      pixKey: session.restaurant.pixKey, pixQrCodeUrl: session.restaurant.pixQrCodeUrl,
       primaryColor: session.restaurant.primaryColor, secondaryColor: session.restaurant.secondaryColor,
       deliveryEstimateMin: session.restaurant.deliveryEstimateMin, deliveryEstimateMax: session.restaurant.deliveryEstimateMax,
       minimumOrder: money(session.restaurant.minimumOrder), acceptScheduledOrders: session.restaurant.acceptScheduledOrders,
@@ -84,8 +85,9 @@ export async function getPublicMenu(token: string) {
 }
 
 async function getOrCreateSessionCart(sessionId: string, restaurantId: string) {
-  return (await prisma.cart.findUnique({ where: { menuSessionId: sessionId } }))
-    ?? prisma.cart.create({ data: { menuSessionId: sessionId, restaurantId } });
+  const existing = await prisma.cart.findUnique({ where: { menuSessionId: sessionId } });
+  if (existing && !existing.active) throw new HttpError(409, 'Este pedido já foi finalizado. Abra o cardápio novamente para iniciar outro pedido.');
+  return existing ?? prisma.cart.create({ data: { menuSessionId: sessionId, restaurantId } });
 }
 
 async function cartPayload(sessionId: string, restaurantId: string) {
@@ -93,7 +95,7 @@ async function cartPayload(sessionId: string, restaurantId: string) {
     where: { menuSessionId: sessionId },
     include: { items: { include: { product: true }, orderBy: { id: 'asc' } } },
   });
-  if (!cart) return { id: null, items: [], subtotal: 0, couponCode: null };
+  if (!cart || !cart.active) return { id: null, items: [], subtotal: 0, couponCode: null };
   if (cart.restaurantId !== restaurantId) throw new HttpError(403, 'Carrinho inválido.');
   const subtotal = cart.items.reduce((sum, item) => sum + money(item.subtotal), 0);
   const coupon = cart.couponCode ? await prisma.coupon.findFirst({ where: {
@@ -128,7 +130,7 @@ export async function addPublicCartItem(token: string, input: PublicCartItemInpu
   const cart = await getOrCreateSessionCart(session.id, session.restaurantId);
   const quantity = Math.min(20, Math.max(1, Math.floor(input.quantity)));
   const priced = input.pizza
-    ? await pricePizza(session.restaurantId, input.pizza)
+    ? await pricePizza(session.restaurantId, { ...input.pizza, productId: input.productId })
     : await priceProduct(session.restaurantId, input.productId);
   if (priced.productId !== input.productId && !input.pizza) throw new HttpError(422, 'Produto inválido.');
   const config = priced.configuration as Record<string, unknown>;
@@ -188,7 +190,7 @@ async function repriceCart(sessionId: string, restaurantId: string) {
       const extras = (item.extras ?? {}) as { ids?: string[] };
       const size = await prisma.pizzaSize.findFirst({ where: { restaurantId, name: item.sizeName, active: true } });
       if (!size || !crust.id) throw new HttpError(422, 'Uma configuração da pizza não está mais disponível.');
-      const priced = await pricePizza(restaurantId, { sizeId: size.id, flavorIds: flavors.ids ?? [], crustId: crust.id, extraIds: extras.ids ?? [] });
+      const priced = await pricePizza(restaurantId, { productId: item.productId, sizeId: size.id, flavorIds: flavors.ids ?? [], crustId: crust.id, extraIds: extras.ids ?? [] });
       items.push({ ...priced, quantity: item.quantity, notes: item.notes });
     } else {
       const priced = await priceProduct(restaurantId, item.productId);
@@ -209,9 +211,11 @@ export async function checkoutPublicCart(token: string, input: CheckoutInput) {
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   if (subtotal < money(session.restaurant.minimumOrder)) throw new HttpError(422, `O pedido mínimo é R$ ${money(session.restaurant.minimumOrder).toFixed(2).replace('.', ',')}.`);
   const zone = input.fulfillment === 'DELIVERY'
-    ? await prisma.deliveryZone.findFirst({ where: { restaurantId: session.restaurantId, neighborhood: { equals: input.neighborhood ?? '', mode: 'insensitive' }, active: true } })
+    ? await prisma.deliveryZone.findFirst({ where: {
+      restaurantId: session.restaurantId, active: true,
+      ...(input.neighborhood ? { neighborhood: { equals: input.neighborhood, mode: 'insensitive' as const } } : {}),
+    }, orderBy: { neighborhood: 'asc' } })
     : null;
-  if (input.fulfillment === 'DELIVERY' && !zone) throw new HttpError(422, 'Selecione uma região de entrega atendida.');
   let discount = 0;
   let coupon: Awaited<ReturnType<typeof prisma.coupon.findFirst>> = null;
   if (cart.couponCode) {
@@ -235,13 +239,14 @@ export async function checkoutPublicCart(token: string, input: CheckoutInput) {
     const created = await tx.order.create({ data: {
       restaurantId: session.restaurantId, customerId: customer.id, number: (last?.number ?? 1000) + 1,
       subtotal, deliveryFee, discount, total, paymentMethod: input.paymentMethod,
-      address: input.fulfillment === 'DELIVERY' ? { ...input.address, neighborhood: zone!.neighborhood } as Prisma.InputJsonValue : undefined,
-      notes: input.notes?.slice(0, 300), estimatedAt: zone ? new Date(Date.now() + zone.estimatedMinutes * 60_000) : undefined,
+      status: OrderStatus.NEW,
+      address: input.fulfillment === 'DELIVERY' ? { ...input.address, ...(zone ? { neighborhood: zone.neighborhood } : {}) } as Prisma.InputJsonValue : undefined,
+      notes: input.notes?.slice(0, 300), estimatedAt: input.fulfillment === 'DELIVERY' ? new Date(Date.now() + (zone?.estimatedMinutes ?? session.restaurant.deliveryEstimateMax) * 60_000) : undefined,
       idempotencyKey: input.idempotencyKey, trackingTokenHash: sha256(trackingToken), menuSessionId: session.id,
       conversationId: session.conversationId,
       items: { create: items.map((item) => ({ productId: item.productId, name: item.name, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.unitPrice * item.quantity, configuration: item.configuration, notes: item.notes })) },
-      statusHistory: { create: { status: 'NEW' } },
-      payment: { create: { method: input.paymentMethod, amount: total, changeFor: input.paymentMethod === 'CASH' ? input.changeFor : undefined } },
+      statusHistory: { create: { status: OrderStatus.NEW } },
+      payment: { create: { provider: 'MANUAL', method: input.paymentMethod, amount: total, changeFor: input.paymentMethod === 'CASH' ? input.changeFor : undefined } },
     }, include: { items: true, customer: true, statusHistory: true } });
     await tx.cart.update({ where: { id: cart.id }, data: { active: false, checkedOutAt: new Date(), customerId: customer.id } });
     await tx.menuSession.update({ where: { id: session.id }, data: { usedAt: new Date(), customerId: customer.id } });
@@ -251,7 +256,8 @@ export async function checkoutPublicCart(token: string, input: CheckoutInput) {
     return created;
   });
   orderEvents.emit('changed', { type: 'ORDER_CREATED', orderId: order.id, restaurantId: session.restaurantId });
-  sendWhatsAppNotification({ restaurantId: session.restaurantId, customerId: order.customerId, phone, text: `🍕 *Pedido recebido!*\n\nPedido *#${order.number}*\nTotal: *R$ ${total.toFixed(2).replace('.', ',')}*\n\nStatus: 🕐 Aguardando confirmação.` }).catch(() => undefined);
+  const paymentLabel = input.paymentMethod === 'PIX' ? 'PIX no local' : input.paymentMethod === 'CARD' ? 'Cartão no local' : 'Dinheiro no local';
+  sendWhatsAppNotification({ restaurantId: session.restaurantId, customerId: order.customerId, phone, text: `🍕 *Pedido recebido!*\n\nPedido *#${order.number}*\nTotal: *R$ ${total.toFixed(2).replace('.', ',')}*\nPagamento: *${paymentLabel}*\n\nStatus: aguardando o início do preparo.` }).catch(() => undefined);
   return { order, trackingToken };
 }
 
@@ -261,6 +267,32 @@ export async function getTrackedOrder(token: string) {
     include: { restaurant: { select: { name: true, primaryColor: true } }, items: true, statusHistory: { orderBy: { createdAt: 'asc' } } },
   });
   if (!order) throw new HttpError(404, 'Pedido não encontrado.');
+  return order;
+}
+
+export async function cancelTrackedOrder(token: string) {
+  const trackingTokenHash = sha256(token);
+  const order = await prisma.$transaction(async (tx) => {
+    const cancelled = await tx.order.updateMany({
+      where: { trackingTokenHash, status: { in: [OrderStatus.NEW, OrderStatus.CONFIRMED] } },
+      data: { status: OrderStatus.CANCELLED },
+    });
+    const current = await tx.order.findUnique({
+      where: { trackingTokenHash },
+      include: { restaurant: { select: { name: true, primaryColor: true } }, items: true, statusHistory: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!current) throw new HttpError(404, 'Pedido não encontrado.');
+    if (!cancelled.count) {
+      if (current.status === OrderStatus.CANCELLED) return current;
+      throw new HttpError(409, 'Este pedido já entrou em preparo e não pode mais ser cancelado pelo acompanhamento.');
+    }
+    await tx.orderStatusHistory.create({ data: { orderId: current.id, status: OrderStatus.CANCELLED } });
+    return tx.order.findUniqueOrThrow({
+      where: { id: current.id },
+      include: { restaurant: { select: { name: true, primaryColor: true } }, items: true, statusHistory: { orderBy: { createdAt: 'asc' } } },
+    });
+  });
+  orderEvents.emit('changed', { type: 'ORDER_UPDATED', orderId: order.id, restaurantId: order.restaurantId, status: OrderStatus.CANCELLED });
   return order;
 }
 

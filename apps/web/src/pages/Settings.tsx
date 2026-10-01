@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Clock3, ImagePlus, Save, Settings as SettingsIcon, Store } from 'lucide-react';
+import { Clock3, CreditCard, ImagePlus, Save, Settings as SettingsIcon, Store } from 'lucide-react';
 import { api } from '../lib/api';
 import { imageFileToDataUrl } from '../lib/image';
 import type { RestaurantSettings } from '../types';
@@ -16,7 +16,7 @@ export function Settings() {
     void api<RestaurantSettings>('/settings').then(setForm).catch((reason) => setError(reason instanceof Error ? reason.message : 'Não foi possível carregar as configurações.')).finally(() => setLoading(false));
   }, []);
 
-  async function attach(field: 'logoUrl' | 'bannerUrl', file?: File) {
+  async function attach(field: 'logoUrl' | 'bannerUrl' | 'pixQrCodeUrl', file?: File) {
     if (!file || !form) return;
     setProcessing(field); setError('');
     try { setForm({ ...form, [field]: await imageFileToDataUrl(file) }); }
@@ -31,6 +31,7 @@ export function Settings() {
     try {
       const saved = await api<RestaurantSettings>('/settings', { method: 'PATCH', body: JSON.stringify({
         name: form.name, phone: form.phone || null, logoUrl: form.logoUrl, bannerUrl: form.bannerUrl,
+        pixKey: form.pixKey || null, pixQrCodeUrl: form.pixQrCodeUrl,
         primaryColor: form.primaryColor, secondaryColor: form.secondaryColor, addressText: form.addressText || null,
         openingHoursText: form.openingHoursText || null, deliveryEstimateMin: Number(form.deliveryEstimateMin),
         deliveryEstimateMax: Number(form.deliveryEstimateMax), minimumOrder: Number(form.minimumOrder),
@@ -53,6 +54,7 @@ export function Settings() {
         <div className="settings-images"><div><span>Logotipo</span>{form.logoUrl ? <img src={form.logoUrl} alt="Logotipo" /> : <div className="image-placeholder"><ImagePlus /></div>}<label className="button ghost file-button"><ImagePlus size={16} /> {processing === 'logoUrl' ? 'Processando…' : 'Alterar logo'}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void attach('logoUrl', event.target.files?.[0])} /></label>{form.logoUrl && <button type="button" className="text-danger" onClick={() => setForm({ ...form, logoUrl: null })}>Remover</button>}</div><div className="banner-setting"><span>Banner</span>{form.bannerUrl ? <img src={form.bannerUrl} alt="Banner" /> : <div className="image-placeholder"><ImagePlus /></div>}<label className="button ghost file-button"><ImagePlus size={16} /> {processing === 'bannerUrl' ? 'Processando…' : 'Alterar banner'}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void attach('bannerUrl', event.target.files?.[0])} /></label>{form.bannerUrl && <button type="button" className="text-danger" onClick={() => setForm({ ...form, bannerUrl: null })}>Remover</button>}</div></div>
       </section>
       <section className="panel settings-card"><header><Clock3 /><div><h3>Operação e pedidos</h3><p>Prazos e regras usadas no cálculo do pedido.</p></div></header><div className="editor-grid"><label>Prazo mínimo (min)<input type="number" min="0" max="600" value={form.deliveryEstimateMin} onChange={(event) => setForm({ ...form, deliveryEstimateMin: Number(event.target.value) })} /></label><label>Prazo máximo (min)<input type="number" min="0" max="600" value={form.deliveryEstimateMax} onChange={(event) => setForm({ ...form, deliveryEstimateMax: Number(event.target.value) })} /></label><label>Pedido mínimo (R$)<input type="number" min="0" step="0.01" value={form.minimumOrder} onChange={(event) => setForm({ ...form, minimumOrder: Number(event.target.value) })} /></label><label>Preço de pizza meio a meio<select value={form.halfPizzaPricing} onChange={(event) => setForm({ ...form, halfPizzaPricing: event.target.value as RestaurantSettings['halfPizzaPricing'] })}><option value="HIGHEST">Maior sabor</option><option value="AVERAGE">Média dos sabores</option></select></label><label className="check-field wide"><input type="checkbox" checked={form.acceptScheduledOrders} onChange={(event) => setForm({ ...form, acceptScheduledOrders: event.target.checked })} /> Aceitar pedidos agendados</label></div><div className="public-menu-link"><span>Link do cardápio público</span><a href={`/r/${form.slug}`} target="_blank" rel="noreferrer">{window.location.origin}/r/{form.slug}</a></div></section>
+      <section className="panel settings-card payment-settings-card"><header><CreditCard /><div><h3>Pagamento no local</h3><p>O cliente informa como pretende pagar; nenhuma cobrança é feita pelo sistema.</p></div></header><div className="local-payment-grid"><div className="payment-info-note"><span><b>PIX</b><small>Pagamento na entrega ou retirada.</small></span></div><div className="payment-info-note"><span><b>Cartão</b><small>Pagamento na máquina, na entrega ou retirada.</small></span></div><div className="payment-info-note"><span><b>Dinheiro</b><small>O cliente também pode informar o valor para troco.</small></span></div></div></section>
     </div>
   </form>;
 }

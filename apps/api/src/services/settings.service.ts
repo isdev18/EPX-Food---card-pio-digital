@@ -7,6 +7,8 @@ export type RestaurantSettingsInput = {
   phone?: string | null;
   logoUrl?: string | null;
   bannerUrl?: string | null;
+  pixKey?: string | null;
+  pixQrCodeUrl?: string | null;
   primaryColor?: string;
   secondaryColor?: string;
   addressText?: string | null;
@@ -26,6 +28,7 @@ function textFromJson(value: Prisma.JsonValue | null, key: string) {
 
 function payload(restaurant: {
   id: string; name: string; slug: string; phone: string | null; logoUrl: string | null; bannerUrl: string | null;
+  pixKey: string | null; pixQrCodeUrl: string | null;
   primaryColor: string; secondaryColor: string; address: Prisma.JsonValue | null; openingHours: Prisma.JsonValue | null;
   deliveryEstimateMin: number; deliveryEstimateMax: number; minimumOrder: unknown; acceptScheduledOrders: boolean; halfPizzaPricing: string;
 }) {
@@ -52,6 +55,8 @@ export async function updateRestaurantSettings(restaurantId: string, input: Rest
     phone: input.phone,
     logoUrl: input.logoUrl,
     bannerUrl: input.bannerUrl,
+    pixKey: input.pixKey,
+    pixQrCodeUrl: input.pixQrCodeUrl,
     primaryColor: input.primaryColor,
     secondaryColor: input.secondaryColor,
     address: input.addressText === undefined ? undefined : input.addressText ? { formatted: input.addressText } : Prisma.JsonNull,

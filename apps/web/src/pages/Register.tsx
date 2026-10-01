@@ -71,6 +71,7 @@ export function Register() {
         <button className="button primary login-submit" disabled={loading}>{loading ? 'Criando conta…' : 'Criar conta'}</button>
         <p className="login-return">Já possui uma conta? <Link to="/login">Entrar no painel</Link></p>
       </form>
+      <footer className="auth-footer">Desenvolvido pela <strong>EPX Group Tech</strong></footer>
     </section>
   </main>;
 }

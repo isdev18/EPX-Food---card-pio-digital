@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Edit3, ImagePlus, Plus, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { Edit3, ExternalLink, ImagePlus, Plus, Search, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { imageFileToDataUrl } from '../lib/image';
-import type { Category, Product } from '../types';
+import type { Category, Flavor, PizzaSize, Product } from '../types';
 
 const brl = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 type ProductEditor = { product?: Product; categoryId: string; name: string; description: string; basePrice: string; imageUrl: string | null; isPizza: boolean };
+type PizzaOptions = { sizes: PizzaSize[]; flavors: Flavor[] };
+type SizeDraft = { id?: string; name: string; slices: string; maxFlavors: string; priceMultiplier: string };
+type FlavorDraft = { id?: string; name: string; description: string; surcharge: string };
+const emptySize = (): SizeDraft => ({ name: '', slices: '8', maxFlavors: '2', priceMultiplier: '1' });
+const emptyFlavor = (): FlavorDraft => ({ name: '', description: '', surcharge: '0' });
 
 export function Catalog() {
   const [catalog, setCatalog] = useState<Category[]>([]);
+  const [menuSlug, setMenuSlug] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
@@ -16,11 +22,15 @@ export function Catalog() {
   const [saving, setSaving] = useState('');
   const [processingImage, setProcessingImage] = useState(false);
   const [editor, setEditor] = useState<ProductEditor | null>(null);
+  const [pizzaOptions, setPizzaOptions] = useState<PizzaOptions>({ sizes: [], flavors: [] });
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [sizeDraft, setSizeDraft] = useState<SizeDraft>(emptySize);
+  const [flavorDraft, setFlavorDraft] = useState<FlavorDraft>(emptyFlavor);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    void api<Category[]>('/catalog').then((result) => { if (active) setCatalog(result); })
+    void Promise.all([api<Category[]>('/catalog'), api<PizzaOptions>('/catalog/pizza-options'), api<{ slug: string }>('/settings')]).then(([result, options, settings]) => { if (active) { setCatalog(result); setPizzaOptions(options); setMenuSlug(settings.slug); } })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar o cardápio.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -37,9 +47,13 @@ export function Catalog() {
     setCatalog((current) => current.map((category) => ({ ...category, products: category.products.map((product) => product.id === updated.id ? updated : product) })));
   }
 
+  async function refreshPizzaOptions() {
+    setPizzaOptions(await api<PizzaOptions>('/catalog/pizza-options'));
+  }
+
   async function toggle(product: Product) {
     setSaving(product.id); setError('');
-    try { replaceProduct(await api<Product>(`/catalog/products/${product.id}`, { method: 'PATCH', body: JSON.stringify({ active: !product.active }) })); }
+    try { replaceProduct(await api<Product>(`/catalog/products/${product.id}`, { method: 'PATCH', body: JSON.stringify({ active: !product.active }) })); await refreshPizzaOptions(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível alterar a disponibilidade.'); }
     finally { setSaving(''); }
   }
@@ -76,6 +90,7 @@ export function Catalog() {
         const product = await api<Product>('/catalog/products', { method: 'POST', body: JSON.stringify({ ...payload, categoryId: editor.categoryId, isPizza: editor.isPizza }) });
         setCatalog((current) => current.map((category) => category.id === editor.categoryId ? { ...category, products: [...category.products, product] } : category));
       }
+      await refreshPizzaOptions();
       setEditor(null);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o produto.'); }
     finally { setSaving(''); }
@@ -87,7 +102,53 @@ export function Catalog() {
     try {
       await api<{ ok: boolean }>(`/catalog/products/${product.id}`, { method: 'DELETE' });
       setCatalog((current) => current.map((category) => ({ ...category, products: category.products.filter((item) => item.id !== product.id) })));
+      await refreshPizzaOptions();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível excluir o produto.'); }
+    finally { setSaving(''); }
+  }
+
+  async function saveSize(event: FormEvent) {
+    event.preventDefault();
+    const payload = { name: sizeDraft.name, slices: Number(sizeDraft.slices), maxFlavors: Number(sizeDraft.maxFlavors), priceMultiplier: Number(sizeDraft.priceMultiplier.replace(',', '.')) };
+    if (!payload.name.trim() || !Number.isInteger(payload.slices) || !Number.isInteger(payload.maxFlavors) || !Number.isFinite(payload.priceMultiplier)) return setError('Preencha os dados do tamanho corretamente.');
+    setSaving(sizeDraft.id ?? 'new-size'); setError('');
+    try {
+      const saved = await api<PizzaSize>(sizeDraft.id ? `/catalog/sizes/${sizeDraft.id}` : '/catalog/sizes', { method: sizeDraft.id ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
+      setPizzaOptions((current) => ({ ...current, sizes: sizeDraft.id ? current.sizes.map((item) => item.id === saved.id ? saved : item) : [...current.sizes, saved] }));
+      setSizeDraft(emptySize());
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o tamanho.'); }
+    finally { setSaving(''); }
+  }
+
+  async function saveFlavor(event: FormEvent) {
+    event.preventDefault();
+    const payload = { name: flavorDraft.name, description: flavorDraft.description, surcharge: Number(flavorDraft.surcharge.replace(',', '.')) };
+    if (!payload.name.trim() || !Number.isFinite(payload.surcharge)) return setError('Preencha os dados do sabor corretamente.');
+    setSaving(flavorDraft.id ?? 'new-flavor'); setError('');
+    try {
+      const saved = await api<Flavor>(flavorDraft.id ? `/catalog/flavors/${flavorDraft.id}` : '/catalog/flavors', { method: flavorDraft.id ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
+      setPizzaOptions((current) => ({ ...current, flavors: flavorDraft.id ? current.flavors.map((item) => item.id === saved.id ? saved : item) : [...current.flavors, saved] }));
+      setFlavorDraft(emptyFlavor());
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível salvar o sabor.'); }
+    finally { setSaving(''); }
+  }
+
+  async function toggleOption(kind: 'sizes' | 'flavors', item: PizzaSize | Flavor) {
+    setSaving(item.id); setError('');
+    try {
+      const saved = await api<PizzaSize | Flavor>(`/catalog/${kind}/${item.id}`, { method: 'PATCH', body: JSON.stringify({ active: !item.active }) });
+      setPizzaOptions((current) => ({ ...current, [kind]: current[kind].map((entry) => entry.id === saved.id ? saved : entry) } as PizzaOptions));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível alterar a disponibilidade.'); }
+    finally { setSaving(''); }
+  }
+
+  async function removeOption(kind: 'sizes' | 'flavors', item: PizzaSize | Flavor) {
+    if (!window.confirm(`Excluir “${item.name}”?`)) return;
+    setSaving(item.id); setError('');
+    try {
+      await api<{ ok: boolean }>(`/catalog/${kind}/${item.id}`, { method: 'DELETE' });
+      setPizzaOptions((current) => ({ ...current, [kind]: current[kind].filter((entry) => entry.id !== item.id) } as PizzaOptions));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível excluir este item.'); }
     finally { setSaving(''); }
   }
 
@@ -97,7 +158,7 @@ export function Catalog() {
     <div className="catalog-summary"><div><b>{products.length}</b><span>produtos cadastrados</span></div><div><b>{products.filter((product) => product.active).length}</b><span>disponíveis agora</span></div><div><b>{catalog.length}</b><span>categorias ativas</span></div></div>
     <div className="page-toolbar">
       <label className="page-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar produto" /></label>
-      <div><button className={`button ghost ${onlyAvailable ? 'filter-active' : ''}`} onClick={() => setOnlyAvailable(!onlyAvailable)}><SlidersHorizontal size={16} /> {onlyAvailable ? 'Só disponíveis' : 'Todos os itens'}</button><button className="button primary" onClick={openNewProduct}><Plus size={17} /> Novo produto</button></div>
+      <div><a className="button ghost" href={`/r/${menuSlug}`} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Visualizar cardápio</a><button className="button ghost" onClick={() => setOptionsOpen(true)}><Settings2 size={16} /> Tamanhos e sabores</button><button className={`button ghost ${onlyAvailable ? 'filter-active' : ''}`} onClick={() => setOnlyAvailable(!onlyAvailable)}><SlidersHorizontal size={16} /> {onlyAvailable ? 'Só disponíveis' : 'Todos os itens'}</button><button className="button primary" onClick={openNewProduct}><Plus size={17} /> Novo produto</button></div>
     </div>
     <div className="category-tabs"><button className={activeCategory === 'all' ? 'active' : ''} onClick={() => setActiveCategory('all')}>Todos</button>{catalog.map((category) => <button className={activeCategory === category.id ? 'active' : ''} key={category.id} onClick={() => setActiveCategory(category.id)}>{category.icon} {category.name}</button>)}</div>
     <div className="product-grid">{products.map((product) => <article className="product-card" key={product.id}>
@@ -112,5 +173,19 @@ export function Catalog() {
       </div>
       <footer><button type="button" className="button ghost" onClick={() => setEditor(null)}>Cancelar</button><button className="button primary" disabled={Boolean(saving) || processingImage}>{saving ? 'Salvando…' : 'Salvar produto'}</button></footer>
     </form></div>}
+    {optionsOpen && <div className="modal-layer"><button className="drawer-backdrop" aria-label="Fechar" onClick={() => setOptionsOpen(false)} /><section className="modal pizza-options-modal">
+      <header><div><span className="eyebrow">PIZZAS</span><h2>Tamanhos e sabores</h2><p>Configure as opções que o cliente verá ao montar a pizza.</p></div><button type="button" className="icon-button" onClick={() => setOptionsOpen(false)}><X size={18} /></button></header>
+      {error && <div className="form-error">{error}</div>}
+      <div className="pizza-options-grid">
+        <section><div className="option-manager-title"><div><h3>Tamanhos</h3><small>Pequena, média, grande, família e outros.</small></div></div>
+          <form className="compact-option-form" onSubmit={(event) => void saveSize(event)}><label>Nome<input required value={sizeDraft.name} onChange={(event) => setSizeDraft({ ...sizeDraft, name: event.target.value })} placeholder="Ex.: Família" /></label><label>Fatias<input required type="number" min="1" max="40" value={sizeDraft.slices} onChange={(event) => setSizeDraft({ ...sizeDraft, slices: event.target.value })} /></label><label>Máx. sabores<input required type="number" min="1" max="4" value={sizeDraft.maxFlavors} onChange={(event) => setSizeDraft({ ...sizeDraft, maxFlavors: event.target.value })} /></label><label>Multiplicador<input required inputMode="decimal" value={sizeDraft.priceMultiplier} onChange={(event) => setSizeDraft({ ...sizeDraft, priceMultiplier: event.target.value })} /></label><div><button type="submit" className="button primary" disabled={Boolean(saving)}>{sizeDraft.id ? 'Atualizar' : 'Adicionar'}</button>{sizeDraft.id && <button type="button" className="button ghost" onClick={() => setSizeDraft(emptySize())}>Cancelar</button>}</div></form>
+          <div className="option-manager-list">{pizzaOptions.sizes.map((item) => <article key={item.id} className={!item.active ? 'inactive' : ''}><div><b>{item.name}</b><small>{item.slices} fatias · até {item.maxFlavors} {item.maxFlavors === 1 ? 'sabor' : 'sabores'} · {item.priceMultiplier}× o preço</small></div><label className="switch"><input checked={item.active} disabled={saving === item.id} onChange={() => void toggleOption('sizes', item)} type="checkbox" /><i /></label><button onClick={() => setSizeDraft({ id: item.id, name: item.name, slices: String(item.slices), maxFlavors: String(item.maxFlavors), priceMultiplier: String(item.priceMultiplier) })} aria-label={`Editar ${item.name}`}><Edit3 size={15} /></button><button className="danger" onClick={() => void removeOption('sizes', item)} aria-label={`Excluir ${item.name}`}><Trash2 size={15} /></button></article>)}</div>
+        </section>
+        <section><div className="option-manager-title"><div><h3>Sabores</h3><small>Opções exibidas ao cliente no cardápio.</small></div></div>
+          <form className="compact-option-form flavor-form" onSubmit={(event) => void saveFlavor(event)}><label>Nome<input required value={flavorDraft.name} onChange={(event) => setFlavorDraft({ ...flavorDraft, name: event.target.value })} placeholder="Ex.: Calabresa" /></label><label>Descrição<input value={flavorDraft.description} onChange={(event) => setFlavorDraft({ ...flavorDraft, description: event.target.value })} placeholder="Ingredientes do sabor" /></label><label>Acréscimo (R$)<input required inputMode="decimal" value={flavorDraft.surcharge} onChange={(event) => setFlavorDraft({ ...flavorDraft, surcharge: event.target.value })} /></label><div><button type="submit" className="button primary" disabled={Boolean(saving)}>{flavorDraft.id ? 'Atualizar' : 'Adicionar'}</button>{flavorDraft.id && <button type="button" className="button ghost" onClick={() => setFlavorDraft(emptyFlavor())}>Cancelar</button>}</div></form>
+          <div className="option-manager-list">{pizzaOptions.flavors.map((item) => <article key={item.id} className={!item.active ? 'inactive' : ''}><div><b>{item.name}</b><small>{item.description || 'Sem descrição'}{item.surcharge > 0 ? ` · + ${brl(item.surcharge)}` : ' · sem acréscimo'}</small></div><label className="switch"><input checked={item.active} disabled={saving === item.id} onChange={() => void toggleOption('flavors', item)} type="checkbox" /><i /></label><button onClick={() => setFlavorDraft({ id: item.id, name: item.name, description: item.description ?? '', surcharge: String(item.surcharge) })} aria-label={`Editar ${item.name}`}><Edit3 size={15} /></button><button className="danger" onClick={() => void removeOption('flavors', item)} aria-label={`Excluir ${item.name}`}><Trash2 size={15} /></button></article>)}</div>
+        </section>
+      </div>
+    </section></div>}
   </div>;
 }

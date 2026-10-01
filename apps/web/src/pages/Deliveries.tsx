@@ -63,7 +63,7 @@ export function Deliveries() {
   const activeZones = zones.filter((zone) => zone.active);
   const averageFee = activeZones.length ? activeZones.reduce((sum, zone) => sum + zone.fee, 0) / activeZones.length : 0;
   const outForDelivery = deliveryOrders.filter((order) => order.status === 'OUT_FOR_DELIVERY').length;
-  const deliveredToday = orders.filter((order) => order.address && order.status === 'DELIVERED'
+  const dispatchedToday = orders.filter((order) => order.address && ['OUT_FOR_DELIVERY', 'DELIVERED'].includes(order.status)
     && new Date(order.updatedAt ?? order.createdAt).toDateString() === new Date().toDateString()).length;
 
   function openCreate() {
@@ -159,7 +159,7 @@ export function Deliveries() {
       <article><span><MapPin /></span><div><small>Áreas ativas</small><strong>{activeZones.length}</strong></div></article>
       <article><span><PackageCheck /></span><div><small>Taxa média</small><strong>{brl(averageFee)}</strong></div></article>
       <article><span><Truck /></span><div><small>Em rota agora</small><strong>{outForDelivery}</strong></div></article>
-      <article><span><CheckCircle2 /></span><div><small>Entregues hoje</small><strong>{deliveredToday}</strong></div></article>
+      <article><span><CheckCircle2 /></span><div><small>Saíram hoje</small><strong>{dispatchedToday}</strong></div></article>
     </section>
 
     <section className="panel delivery-zones-panel">
@@ -180,15 +180,15 @@ export function Deliveries() {
     </section>
 
     <section className="panel delivery-orders-panel">
-      <header className="delivery-section-head"><div><h2>Operação de entregas</h2><p>Pedidos prontos e em rota, sincronizados com a tela de Pedidos.</p></div><Link className="button ghost" to="/pedidos?status=OUT_FOR_DELIVERY">Abrir todos os pedidos</Link></header>
+      <header className="delivery-section-head"><div><h2>Operação de entregas</h2><p>Pedidos em preparação e com o motoboy, sincronizados com a tela de Pedidos.</p></div><Link className="button ghost" to="/pedidos?status=OUT_FOR_DELIVERY">Abrir todos os pedidos</Link></header>
       <div className="delivery-order-list">
         {deliveryOrders.map((order) => <article className="delivery-order-row" key={order.id}>
           <button className="delivery-order-main" onClick={() => setSelectedOrder(order)}>
             <span className={`delivery-order-icon ${order.status.toLowerCase()}`}>{order.status === 'READY' ? <PackageCheck /> : <Truck />}</span>
             <div><b>Pedido #{order.number} · {order.customer.name ?? 'Cliente WhatsApp'}</b><small><MapPin /> {order.address?.street}, {order.address?.number} · {order.address?.neighborhood}</small></div>
           </button>
-          <div className="delivery-order-meta"><span className={`status-pill ${order.status.toLowerCase()}`}>{order.status === 'READY' ? 'Pronto para sair' : 'Em entrega'}</span><small><Clock3 /> {order.estimatedAt ? `Previsão ${new Date(order.estimatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Sem previsão'}</small></div>
-          <button className="button primary delivery-order-action" disabled={saving === order.id} onClick={() => void changeOrderStatus(order, order.status === 'READY' ? 'OUT_FOR_DELIVERY' : 'DELIVERED')}>{saving === order.id ? 'Atualizando…' : order.status === 'READY' ? 'Enviar para entrega' : 'Marcar como entregue'}</button>
+          <div className="delivery-order-meta"><span className={`status-pill ${order.status.toLowerCase()}`}>{order.status === 'READY' ? 'Está sendo preparado' : 'Motoboy saiu para entrega'}</span><small><Clock3 /> {order.estimatedAt ? `Previsão ${new Date(order.estimatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Sem previsão'}</small></div>
+          {order.status === 'READY' && <button className="button primary delivery-order-action" disabled={saving === order.id} onClick={() => void changeOrderStatus(order, 'OUT_FOR_DELIVERY')}>{saving === order.id ? 'Atualizando…' : 'Motoboy saiu para entrega'}</button>}
         </article>)}
         {!deliveryOrders.length && <div className="delivery-empty"><CheckCircle2 /><b>Tudo em dia</b><span>Não há pedidos aguardando saída ou em rota.</span></div>}
       </div>

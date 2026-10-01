@@ -9,6 +9,7 @@ export const publicRouter = Router();
 
 const sessionLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false });
 const checkoutLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false });
+const cancellationLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false });
 
 publicRouter.post('/restaurants/:slug/sessions', sessionLimiter, asyncHandler(async (req, res) => {
   z.object({}).strict().parse(req.body ?? {});
@@ -48,6 +49,7 @@ publicRouter.post('/menu/:token/checkout', checkoutLimiter, asyncHandler(async (
   res.status(201).json(await menu.checkoutPublicCart(String(req.params.token), input));
 }));
 publicRouter.get('/orders/:token', asyncHandler(async (req, res) => res.json(await menu.getTrackedOrder(String(req.params.token)))));
+publicRouter.post('/orders/:token/cancel', cancellationLimiter, asyncHandler(async (req, res) => res.json(await menu.cancelTrackedOrder(String(req.params.token)))));
 publicRouter.post('/menu/:token/events', asyncHandler(async (req, res) => {
   const input = z.object({ name: z.string(), payload: z.record(z.unknown()).optional() }).parse(req.body);
   res.status(202).json(await menu.recordPublicEvent(String(req.params.token), input.name, input.payload));

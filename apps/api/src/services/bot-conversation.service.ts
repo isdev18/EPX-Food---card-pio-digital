@@ -143,7 +143,8 @@ export async function resolveBotConversation(restaurantId: string, conversation:
     }
     if (choice === 4) {
       const order = await prisma.order.findFirst({ where: { restaurantId, customerId: conversation.customerId }, orderBy: { createdAt: 'desc' } });
-      const labels: Record<string, string> = { NEW: 'Recebido', CONFIRMED: 'Confirmado', PREPARING: 'Em preparação', READY: 'Pronto', OUT_FOR_DELIVERY: 'Saiu para entrega', DELIVERED: 'Entregue', CANCELLED: 'Cancelado' };
+      const isDelivery = Boolean(order?.address);
+      const labels: Record<string, string> = { NEW: 'Pedido recebido, aguardando o preparo', CONFIRMED: 'Pedido recebido, aguardando o preparo', PREPARING: 'Está sendo preparado', READY: isDelivery ? 'Está sendo preparado' : 'Já está pronto, pode ir retirar', OUT_FOR_DELIVERY: 'O motoboy saiu para entrega', DELIVERED: isDelivery ? 'O motoboy saiu para entrega' : 'Já está pronto, pode ir retirar', CANCELLED: 'Cancelado' };
       const result = order ? `Pedido #${order.number}: ${labels[order.status] ?? order.status}.` : 'Não encontrei pedidos para este número.';
       return { next: 'IDLE', text: `📦 ${result}\n\n0. Voltar ao menu principal`, context: { menuShown: true } };
     }

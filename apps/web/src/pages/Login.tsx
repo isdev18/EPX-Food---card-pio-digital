@@ -38,7 +38,7 @@ export function Login() {
       <div className="login-overlay">
         <Brand />
         <div><span className="kicker">Feito para pizzarias</span><h1>Mais pedidos.<br />Menos correria.</h1><p>WhatsApp, cozinha e entregas trabalhando juntos, em tempo real.</p></div>
-        <blockquote>“WhatsApp, cardápio e operação em um só lugar.”<small>— EPX Food</small></blockquote>
+        <blockquote>“WhatsApp, cardápio e operação em um só lugar.”<small>— EPX Menu</small></blockquote>
       </div>
     </section>
     <section className="login-form-wrap">
@@ -56,6 +56,7 @@ export function Login() {
         <div className="login-divider"><span>ou</span></div>
         <Link className="button login-signup" to="/cadastro"><UserPlus size={17} /> Criar minha conta</Link>
       </form>
+      <footer className="auth-footer">Desenvolvido pela <strong>EPX Group Tech</strong></footer>
     </section>
   </main>;
 }
